@@ -2,7 +2,7 @@ name: tiktok-daily-pipeline
 
 on:
   schedule:
-    - cron: "20 22 * * *"   # UTC
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
