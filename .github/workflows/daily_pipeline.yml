@@ -1,12 +1,13 @@
 name: tiktok-daily-pipeline
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
   
 
 jobs:
-  workflow_dispatch:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
