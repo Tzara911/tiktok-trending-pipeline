@@ -365,6 +365,81 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
         print(f"Error during Supabase upsert: {e}")
 
 
+def insert_rank_snapshot(products,run_id: str,top_k: int=10, table_name: str = "tiktok_rank_snapshots"):
+    ''' Inserts a daily ranking snapshot for the top K products into tiktok_rank_snapshots table
+        We store what we are about to upsert into tiktok_products, but as a historical snapshot.
+        values are cleaned via parse_money / parse_int to match numeric columns
+    '''
+    if not products:
+        print("No products provided for rank snapshot insertion.")
+        return
+    
+    captured_at = get_utc_now()
+    top_k = min(top_k, len(products))
+    snapshots = []
+    
+    for rank, product in enumerate(products[:top_k], start=1):
+        title = (
+            product.get("title")
+            or product.get("product_name")
+            or product.get("name")
+        )
+        if not title:
+            continue    
+        category = product.get("category")
+        if not category:    
+            cats = product.get("categories")
+            if isinstance(cats, list) and cats:
+                category = cats[0]
+        cover = product.get("cover_url")
+        shop_name = None  
+        seller = product.get("seller")
+        if isinstance(seller, dict):
+            shop_name = seller.get("seller_name")     
+        
+        product_id=(
+            product.get("product_id")
+            or product.get("id")
+            or product.get("goods_id")
+        )        
+        
+        snapshot = {
+            "run_id": run_id,
+            "top_k": top_k,
+            "rank": rank,
+            "product_id": str(product_id) if product_id is not None else None,
+            "title": title,
+            "category": category,
+            "cover": cover,
+            "shop_name": shop_name,
+            "captured_at": captured_at,
+            "total_sold_count": parse_int(product.get("total_sale_cnt")),
+            "recent_sold_count": parse_int(product.get("sale_cnt")),
+            "sale_amount": parse_money(product.get("total_sale_gmv_amt")),
+            "price": parse_money(
+                product.get("avg_price")
+                or product.get("min_price")
+                or product.get("max_price")
+            ),
+            "commission_rate": parse_money(product.get("commission")),
+            
+            
+        }    
+        snapshots.append(snapshot)
+
+    if not snapshots:
+        print("No valid snapshots to insert.")
+        return
+
+    print(f"Inserting {len(snapshots)} rank snapshots into '{table_name}'...")
+    
+    try:
+        response = supabase.table(table_name).insert(snapshots).execute()
+        print(f"Supabase inserted: {len(response.data)} rows.")
+    except Exception as e:
+        print(f"Error during Supabase insert: {e}")
+        raise
+
 
 
 def read_sorted_by_sold_count(table_name: str = "tiktok_products"):
@@ -500,6 +575,9 @@ def parse_money(val):
     if isinstance(val, str):
         try:
             cleaned = val.replace("$", "").replace(",", "").strip()
+            #handle prcent like 15%-> 15.0 so Supabase numeric insert won't fail
+            if cleaned.endswith("%"):
+                cleaned = cleaned[:-1].strip()               
             if cleaned.endswith("K"):
                 return float(cleaned[:-1]) * 1000.0
             return float(cleaned)
@@ -620,12 +698,16 @@ def main():
             return
 
 
-        # 4) Save CSV + JSON just for the cleaned top products
+        # 3) Save CSV + JSON just for the cleaned top products
         save_csv_and_json(top_products)
-
+         # 4) Insert daily snapshots(history)
+        try:
+            insert_rank_snapshot(top_products,run_id=run_id,top_k=10)
+        except Exception as e:
+            print(f"Warning: snapshot insert failed,continue pipeline. Error: {e}")
         # 5) Upsert into Supabase using the cleaned list ,passing run_id
         upsert_products_to_supabase(top_products, run_id=run_id)
-
+        
         # 6) Build PDF rows directly from THIS RUN's cleaned products
         pdf_rows = [map_product_for_pdf(p) for p in top_products]
 
@@ -641,3 +723,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
