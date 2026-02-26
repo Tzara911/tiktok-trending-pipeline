@@ -7,20 +7,20 @@
 
 --Query 1  Daily Top-K leaderboard by day
 select
-   date_trunc('day', captured_at) as day,
+   day,
    count(*) as rows,
    count(distinct run_id) as runs,
    min(top_k) as min_top_k,
    max(top_k) as max_top_k
 from tiktok_rank_snapshots
 
-group by 1 order by 1 desc;
+group by day order by day desc;
 
 
 
 --Query 2. Daily top 10 products
 select
-  date_trunc('day',captured_at) as day,
+  day,
   rank,
   product_id,
   title,
@@ -28,22 +28,23 @@ select
   recent_sold_count,
   total_sold_count,
   sale_amount,
-  price
+  price,
+  commission_rate
 from tiktok_rank_snapshots
 where top_k=10
 order by day desc, rank asc;
 
 
----Query 3 Day-over-day rank change(negative = moved up, positive = moved down)
+---Query 3 Day-over-day rank change(negative = moved down, positive = moved up)
 with daily as (
     select
-        date_trunc('day',captured_at) as day,
+        day,
         product_id as pid,
         max(title) as title,
         min(rank) as rank
     from tiktok_rank_snapshots
     where top_k =10
-    group by 1, 2
+    group by day, product_id
 ),
 diffs as (
     select 
@@ -60,7 +61,11 @@ select
     title,
     prev_rank,
     rank as current_rank,
-    (prev_rank-rank) as rank_change
+    case
+        when  (prev_rank-rank) > 0 then '+' ||  (prev_rank-rank) ::text
+        when  (prev_rank-rank) < 0 then  (prev_rank-rank) ::text
+        else '0'
+    end as rank_change
 from diffs
 where prev_rank is not null
 order by day desc, abs(prev_rank-rank) desc;
@@ -70,17 +75,17 @@ order by day desc, abs(prev_rank-rank) desc;
 
 
 
---Query 4. Days on board + best rank +first/las seen
+--Query 4. Days on board + best rank +first/last seen
 
 with daily as (
     select
-        date_trunc('day',captured_at) as day,
+        day,
         product_id as pid,
         max(title) as title,
         min(rank ) as rank
     from tiktok_rank_snapshots
     where top_k =10
-    group by 1, 2
+    group by day, product_id
     
 )
 select 
@@ -101,7 +106,7 @@ order by days_on_board desc, best_rank asc;
 
 with daily as(
     select
-        date_trunc('day', captured_at) as day,
+        day,
         product_id as pid,
         max(title) as title,
         max(recent_sold_count ) as recent_sold_count,
@@ -142,7 +147,7 @@ where prev_recent_sold is not null
 
 with daily as (
     select distinct
-        date_trunc('day',captured_at) as day,
+        day,
         product_id as pid,
         title,
         rank
@@ -160,10 +165,12 @@ pairs as (
 entered as (
   select
   p.day,
-  d.pid,
+  d.pid as product_id,
   d.title,
-  d.rank
-  from pairs p join daily d on d.day=p.day
+  d.rank,
+    1 as sort_key
+  from pairs p 
+    join daily d on d.day=p.day
   where p.prev_day is not null
   and not exists(
     select 1
@@ -174,22 +181,32 @@ entered as (
 dropped as(
  select
   p.day,
-  prev.pid,
+  prev.pid as product_id,
   prev.title,
-  prev.rank
- from pairs p join daily prev on prev.day = p.prev_day
+  prev.rank,
+  2 as sort_key
+ from pairs p
+    join daily prev on prev.day = p.prev_day
  where p.prev_day is not null
  and not exists(
   select 1 
-  from daily cur where cur.day =p.day and cur.pid = prev.pid
+  from daily cur 
+    where cur.day =p.day and cur.pid = prev.pid
  ) 
 )
-select 'entered' as change_type, * 
-from entered
+select 
+    change_type,
+    day,
+    product_id,
+    title,
+    rank
+    
+from (
+select 'entered' as change_type, day, product_id, title, rank,sort_key from entered
 union all
-select 'dropped' as change_type,*
-from dropped
-order by day desc, change_type, rank;
+select 'dropped' as change_type, day,product_id, title,rank, sort_key from dropped
+)x
+order by day desc, sort_key asc, rank asc;
 
 
 
