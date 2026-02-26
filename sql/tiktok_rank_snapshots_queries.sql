@@ -60,10 +60,10 @@ select
     title,
     prev_rank,
     rank as current_rank,
-    (rank-prev_rank) as rank_change
+    (prev_rank-rank) as rank_change
 from diffs
 where prev_rank is not null
-order by day desc, abs(rank-prev_rank) desc;
+order by day desc, abs(prev_rank-rank) desc;
 
 
 
