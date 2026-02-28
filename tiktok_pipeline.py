@@ -62,7 +62,57 @@ CSV_FIELDS = [
 ]
 
 
-# helper methods 
+# Helper parsing functions (defined once at module level)
+
+def parse_int(val):
+    """Parse to integer - strips K suffix without multiplying."""
+    if val is None or val == "" or val == "-":
+        return 0
+    
+    try:
+        if isinstance(val, int):
+            return val
+        
+        # Just strip the K, don't multiply
+        val_str = str(val).upper().replace('K', '').replace('.', '')
+        return int(val_str)
+        
+    except (ValueError, TypeError):
+        return 0
+
+
+def parse_money(val):
+    """Parse to float - handles K, M, B multipliers and currency symbols."""
+    if val is None or val == "" or val == "-":
+        return 0.0
+    
+    try:
+        # Handle already numeric
+        if isinstance(val, (int, float)):
+            return float(val)
+        
+        # Clean and convert to uppercase
+        val_str = str(val).upper().replace('$', '').replace(',', '').replace('%', '').strip()
+        
+        # Handle suffixes with multipliers
+        if 'K' in val_str:
+            num = float(val_str.replace('K', ''))
+            return num * 1000
+        if 'M' in val_str:
+            num = float(val_str.replace('M', ''))
+            return num * 1000000
+        if 'B' in val_str:
+            num = float(val_str.replace('B', ''))
+            return num * 1000000000
+        
+        # Regular number
+        return float(val_str)
+        
+    except (ValueError, TypeError):
+        return 0.0
+
+
+# Other helper methods 
 
 def normalize_text(s: str) -> str:
     return (s or "").lower().replace("&", " ").replace("/", " ").replace("-", " ")
@@ -275,20 +325,6 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
       price            <- float(avg_price / min_price / max_price)
       commission_rate  <- float(commission) if present
     """
-
-
-    def parse_money(val):
-        if val in (None, "", "-"):
-            return None
-        if isinstance(val, (int, float)):
-            return float(val)
-        if isinstance(val, str):
-            try:
-                cleaned = val.replace("$", "").replace(",", "").strip()
-                return float(cleaned)
-            except ValueError:
-                return None
-        return None
 
     products_to_upsert = []
 
@@ -556,35 +592,6 @@ def generate_pdf_report(data, filename: str = "tiktok_products_report.pdf"):
     except Exception as e:
         print(f"Error generating PDF: {e}")
 
-def parse_int(val):
-    if val in (None, "", "-"):
-        return 0
-    try:
-        return int(str(val).replace("K", "0").replace(".", "")) if isinstance(val, str) and "K" in val else int(val)
-    except (ValueError, TypeError):
-        # Fallback: try to strip non-digits
-        digits = "".join(ch for ch in str(val) if ch.isdigit())
-        return int(digits) if digits else 0
-
-
-def parse_money(val):
-    if val in (None, "", "-"):
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    if isinstance(val, str):
-        try:
-            cleaned = val.replace("$", "").replace(",", "").strip()
-            #handle prcent like 15%-> 15.0 so Supabase numeric insert won't fail
-            if cleaned.endswith("%"):
-                cleaned = cleaned[:-1].strip()               
-            if cleaned.endswith("K"):
-                return float(cleaned[:-1]) * 1000.0
-            return float(cleaned)
-        except ValueError:
-            return 0.0
-    return 0.0
-
 
 def pick_top_products(products, top_n=10, min_sales=0, use_recent=False):
     scored = []
@@ -723,4 +730,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

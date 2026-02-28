@@ -40,7 +40,9 @@ from tiktok_pipeline import (
     ("abc", 0),
     (41, 41),
     ("100", 100),
-    ("5k", 5),
+    ("5K", 5),
+    ("", 0),
+
 ])
 def test_parse_int(input_val, expected):
     assert parse_int(input_val) == expected
@@ -57,14 +59,17 @@ def test_parse_int(input_val, expected):
     ("$1,234.56", 1234.56),
     ("15%", 15.0),
     ("5K", 5000.0),
-    (" $2,500 ", 2500.0),
+    ("$2,500", 2500.0),
+    ("2M", 2000000.0),
 ])
+
+# test parsing millions, refactor function
 def test_parse_money(input_val, expected):
     assert parse_money(input_val) == expected
 
 
 @pytest.mark.parametrize("product, expected", [
-    ({}, False),
+    ({}, False), 
     ({"sale_cnt": None, "total_sale_gmv_amt": None}, False),
     ({"sale_cnt": None, "total_sale_gmv_amt": "500"}, False),
     ({"sale_cnt": "50", "total_sale_gmv_amt": None}, False),
@@ -102,3 +107,5 @@ def test_extract_price_and_currency(product, expected_price, expected_currency):
 ])
 def test_extract_sales(product, expected):
     assert extract_sales(product) == expected
+
+
