@@ -11,21 +11,19 @@ os.environ["SUPABASE_KEY"] = "fake"
 sys.modules["supabase"] = MagicMock()
 
 from tiktok_pipeline import (
-    parse_int,
+   parse_int,
     parse_money,
     has_valid_metrics,
     pick_top_products,
     extract_price_and_currency,
     extract_sales,
-)
-
-
-from tiktok_pipeline import (
-    parse_int,
-    parse_money,
-    has_valid_metrics,
-    extract_price_and_currency,
-    extract_sales,
+    normalize_text,
+    flatten_categories,
+    iter_products,
+    is_target,
+    product_row,
+    collect_text,
+    to_text,
 )
 
 # to run use pytest instead of python
@@ -295,3 +293,380 @@ def test_pick_top_products(products, top_n, min_sales, use_recent, expected_coun
     # Check first product if we expect any results
     if expected_count > 0 and expected_first_title:
         assert result[0].get("title") == expected_first_title
+
+
+@pytest.mark.parametrize("input_text, expected", [
+    # Special characters replaced with spaces
+    ("Kitchen & Dining", "kitchen   dining"),
+    ("Health/Wellness", "health wellness"),
+    ("Air-Fryer", "air fryer"),
+    
+    # Uppercase converted to lowercase
+    ("UPPERCASE", "uppercase"),
+    ("MixedCase", "mixedcase"),
+    
+    # None returns empty string
+    (None, ""),
+    
+    # Empty string stays empty
+    ("", ""),
+    
+    # Multiple special characters
+    ("Mix & Match / Test-Case", "mix   match   test case"),
+    
+    # Only special characters
+    ("&/-", "   "),
+    
+    # Already normalized text
+    ("already normalized", "already normalized"),
+])
+def test_normalize_text(input_text, expected):
+    assert normalize_text(input_text) == expected
+
+
+@pytest.mark.parametrize("product, expected", [
+    # No categories at all
+    ({}, ""),
+    
+    # Simple string list
+    ({"categories": ["Electronics", "Gadgets"]}, "Electronics; Gadgets"),
+    
+    # Dict with 'name' field
+    ({"categories": [{"name": "Kitchen"}, {"name": "Home"}]}, "Kitchen; Home"),
+    
+    # Dict with 'title' field
+    ({"categories": [{"title": "Sports"}]}, "Sports"),
+    
+    # Dict with 'category_name' field
+    ({"categories": [{"category_name": "Fitness"}]}, "Fitness"),
+    
+    # Dict with 'label' field
+    ({"categories": [{"label": "Health"}]}, "Health"),
+    
+    # Mixed formats (string and dict)
+    ({"categories": ["Electronics", {"name": "Gadgets"}]}, "Electronics; Gadgets"),
+    
+    # Category field as fallback
+    ({"category": "Kitchen"}, "Kitchen"),
+    
+    # Both categories list and category field
+    ({"categories": ["Electronics"], "category": "Gadgets"}, "Electronics; Gadgets"),
+    
+    # Empty list
+    ({"categories": []}, ""),
+    
+    # Invalid category types (should skip non-dict, non-string)
+    ({"categories": [123, None, "Valid"]}, "Valid"),
+    
+    # Dict without any recognized keys
+    ({"categories": [{"unknown": "value"}]}, ""),
+    
+    # Multiple dicts with different key types
+    (
+        {"categories": [{"name": "A"}, {"title": "B"}, {"category_name": "C"}]}, 
+        "A; B; C"
+    ),
+])
+def test_flatten_categories(product, expected):
+    assert flatten_categories(product) == expected
+
+
+@pytest.mark.parametrize("payload, expected_count", [
+    # Direct list of products
+    ([{"id": "1"}, {"id": "2"}], 2),
+    
+    # Nested under 'data' key as list
+    ({"data": [{"id": "1"}, {"id": "2"}]}, 2),
+    
+    # Nested under data.list
+    ({"data": {"list": [{"id": "1"}]}}, 1),
+    
+    # Nested under data.items
+    ({"data": {"items": [{"id": "1"}, {"id": "2"}]}}, 2),
+    
+    # Nested under data.products
+    ({"data": {"products": [{"id": "1"}]}}, 1),
+    
+    # Nested under data.result
+    ({"data": {"result": [{"id": "1"}]}}, 1),
+    
+    # Direct 'products' key at top level
+    ({"products": [{"id": "1"}]}, 1),
+    
+    # Direct 'items' key at top level
+    ({"items": [{"id": "1"}, {"id": "2"}]}, 2),
+    
+    # Direct 'list' key at top level
+    ({"list": [{"id": "1"}]}, 1),
+    
+    # Empty payload
+    ({}, 0),
+    ([], 0),
+    
+    # Non-dict items filtered out from list
+    ([{"id": "1"}, "invalid", None, {"id": "2"}], 2),
+    
+    # Complex nested structure
+    (
+        {
+            "data": {
+                "list": [
+                    {"id": "1", "name": "Product 1"},
+                    {"id": "2", "name": "Product 2"}
+                ]
+            }
+        },
+        2
+    ),
+])
+def test_iter_products(payload, expected_count):
+    result = list(iter_products(payload))
+    assert len(result) == expected_count
+    # Verify all results are dicts
+    for item in result:
+        assert isinstance(item, dict)
+
+
+@pytest.mark.parametrize("product, expected", [
+    # Kitchen keyword match
+    ({"product_name": "Air Fryer Deluxe", "categories": []}, True),
+    ({"title": "Kitchen Knife Set"}, True),
+    ({"name": "Cookware Set"}, True),
+    
+    # Health keyword match
+    ({"title": "Vitamin C Supplement"}, True),
+    ({"product_name": "Wellness Pack"}, True),
+    ({"name": "Skincare Routine"}, True),
+    
+    # Fitness keyword match
+    ({"name": "Yoga Mat", "category": "Sports"}, True),
+    ({"title": "Dumbbell Set"}, True),
+    ({"product_name": "Resistance Band"}, True),
+    
+    # Home keyword match
+    ({"title": "Storage Organizer"}, True),
+    ({"product_name": "Cleaning Supplies"}, True),
+    
+    # Category match
+    ({"product_name": "Random Product", "categories": ["kitchen dining"]}, True),
+    ({"title": "Item", "category": "fitness"}, True),
+    
+    # No match - random product
+    ({"product_name": "Random Toy", "category": "Toys"}, False),
+    ({"title": "Book", "category": "Books"}, False),
+    
+    # Case insensitive matching
+    ({"product_name": "KITCHEN KNIFE"}, True),
+    ({"title": "Health Supplement"}, True),
+    
+    # Special characters normalized
+    ({"product_name": "Kitchen & Dining Set"}, True),
+    ({"title": "Health/Wellness Product"}, True),
+    ({"name": "Air-Fryer"}, True),
+    
+    # Empty product
+    ({}, False),
+    
+    # Product with no name fields
+    ({"price": "10.99", "sales": "100"}, False),
+    
+    # Partial keyword match in longer string
+    ({"product_name": "Premium Kitchenware Collection"}, True),
+    ({"title": "Professional Fitness Equipment"}, True),
+])
+def test_is_target(product, expected):
+    assert is_target(product) == expected
+
+
+@pytest.mark.parametrize("input_val, expected", [
+    # None returns empty string
+    (None, ""),
+    
+    # Empty string stays empty
+    ("", ""),
+    
+    # Regular string converted to string
+    ("test", "test"),
+    
+    # Integer converted to string
+    (123, "123"),
+    
+    # Float converted to string
+    (45.67, "45.67"),
+    
+    # Boolean converted to string
+    (True, "True"),
+    (False, "False"),
+    
+    # Zero stays as string "0"
+    (0, "0"),
+])
+def test_to_text(input_val, expected):
+    assert to_text(input_val) == expected
+
+
+@pytest.mark.parametrize("product, expected_product_name, expected_categories", [
+    # Complete product data
+    (
+        {
+            "product_name": "Test Product",
+            "categories": ["Kitchen", "Home"]
+        },
+        "test product",
+        "kitchen; home"
+    ),
+    
+    # Using 'title' instead of 'product_name'
+    (
+        {
+            "title": "Another Product",
+            "category": "Fitness"
+        },
+        "another product",
+        "fitness"
+    ),
+    
+    # Using 'name' field
+    (
+        {
+            "name": "Third Product",
+            "categories": ["Health"]
+        },
+        "third product",
+        "health"
+    ),
+    
+    # Empty product
+    ({}, "", ""),
+    
+    # Only name, no categories
+    ({"product_name": "Solo Product"}, "solo product", ""),
+    
+    # Special characters normalized
+    (
+        {
+            "product_name": "Kitchen & Dining",
+            "categories": ["Home/Garden"]
+        },
+        "kitchen   dining",
+        "home/garden"
+    ),
+])
+def test_collect_text(product, expected_product_name, expected_categories):
+    result = collect_text(product)
+    # Result should contain the normalized product name
+    assert expected_product_name in result
+    # If there are categories, they should appear in the result
+    if expected_categories:
+        # Categories are also normalized, so check if components are present
+        for cat_part in expected_categories.split("; "):
+            assert cat_part in result or normalize_text(cat_part) in result
+
+
+def test_product_row_complete_data():
+    """Test product_row with complete data"""
+    product = {
+        "product_id": "123",
+        "product_name": "Test Product",
+        "price": "29.99",
+        "currency": "USD",
+        "sales": "1000",
+        "categories": ["Kitchen", "Home"],
+        "shop_info": {"name": "Test Shop", "shop_id": "shop_456"},
+        "product_url": "https://example.com/product",
+        "cover": "https://example.com/image.jpg"
+    }
+    
+    result = product_row(product)
+    
+    assert result["product_id"] == "123"
+    assert result["product_name"] == "Test Product"
+    assert result["price"] == "29.99"
+    assert result["currency"] == "USD"
+    assert result["sales"] == "1000"
+    assert result["categories"] == "Kitchen; Home"
+    assert result["shop_name"] == "Test Shop"
+    assert result["shop_id"] == "shop_456"
+    assert result["product_url"] == "https://example.com/product"
+    assert result["image_url"] == "https://example.com/image.jpg"
+
+
+def test_product_row_minimal_data():
+    """Test product_row with minimal/missing data"""
+    product = {"id": "123"}  # Only ID present
+    result = product_row(product)
+    
+    assert result["product_id"] == "123"
+    assert result["product_name"] == ""
+    assert result["price"] == ""
+    assert result["currency"] == ""
+    assert result["sales"] == ""
+    assert result["categories"] == ""
+    assert result["shop_name"] == ""
+    assert result["shop_id"] == ""
+    assert result["product_url"] == ""
+    assert result["image_url"] == ""
+
+
+def test_product_row_alternative_fields():
+    """Test product_row uses alternative field names"""
+    product = {
+        "id": "456",  # Uses 'id' instead of 'product_id'
+        "title": "Alt Product",  # Uses 'title' instead of 'product_name'
+        "min_price": "15.00",  # Uses 'min_price' instead of 'price'
+        "sold_count": "500",  # Uses 'sold_count' instead of 'sales'
+        "detail_url": "https://example.com/detail",  # Alternative URL field
+        "image": "https://example.com/pic.jpg"  # Alternative image field
+    }
+    
+    result = product_row(product)
+    
+    assert result["product_id"] == "456"
+    assert result["product_name"] == "Alt Product"
+    assert result["price"] == "15.00"
+    assert result["sales"] == "500"
+    assert result["product_url"] == "https://example.com/detail"
+    assert result["image_url"] == "https://example.com/pic.jpg"
+
+
+def test_product_row_shop_info_handling():
+    """Test product_row handles shop_info correctly"""
+    # Valid shop_info dict
+    product_with_shop = {
+        "id": "1",
+        "shop_info": {"name": "Shop A", "shop_id": "shop_1"}
+    }
+    result = product_row(product_with_shop)
+    assert result["shop_name"] == "Shop A"
+    assert result["shop_id"] == "shop_1"
+    
+    # shop_info is not a dict
+    product_no_shop = {
+        "id": "2",
+        "shop_info": "invalid"
+    }
+    result = product_row(product_no_shop)
+    assert result["shop_name"] == ""
+    assert result["shop_id"] == ""
+    
+    # Missing shop_info
+    product_missing = {"id": "3"}
+    result = product_row(product_missing)
+    assert result["shop_name"] == ""
+    assert result["shop_id"] == ""
+
+
+def test_product_row_preserves_structure():
+    """Test that product_row returns all expected CSV fields"""
+    product = {"product_id": "test"}
+    result = product_row(product)
+    
+    # Verify all CSV_FIELDS are present
+    expected_fields = [
+        "product_id", "product_name", "price", "currency", "sales",
+        "category", "categories", "shop_name", "shop_id",
+        "product_url", "image_url"
+    ]
+    
+    for field in expected_fields:
+        assert field in result
