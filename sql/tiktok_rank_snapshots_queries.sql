@@ -209,7 +209,68 @@ select 'dropped' as change_type, day,product_id, title,rank, sort_key from dropp
 order by day desc, sort_key asc, rank asc;
 
 
+-- Q7: Time on board more than 1 day (from first collected day to latest day)
+with base as (
+  select
+    day,
+    product_id,
+    max(title) as title,
+    min(rank) as rank,
+    max(recent_sold_count) as recent_sold_count
+  from tiktok_rank_snapshots
+  where top_k = 10
+  group by day, product_id
+),
+summary as (
+  select
+    product_id,
+    max(title) as title,
+    count(*) as days_on_board,
+    sum(recent_sold_count) as totl_recent_sold_count,
+    max(recent_sold_count) as max_recent_sold_count,
+    min(rank) as best_rank,
+    avg(rank)::numeric(10,2) as avg_rank,
+    min(day) as first_seen_day,
+    max(day) as last_seen_day
+  from base
+  group by product_id
+)
+select *
+from summary
+where days_on_board > 1
+order by days_on_board desc, best_rank asc, avg_rank asc;
 
+
+--Q8: One-day appearances only
+with base as (
+  select
+    day,
+    product_id,
+    max(title) as title,
+    min(rank) as rank,
+    max(recent_sold_count) as recent_sold_count
+  from tiktok_rank_snapshots
+  where top_k = 10
+  group by day, product_id
+),
+summary as (
+  select
+    product_id,
+    max(title) as title,
+    count(*) as days_on_board,
+    sum(recent_sold_count) as totl_recent_sold_count,
+    
+    min(rank) as best_rank,
+    avg(rank)::numeric(10,2) as avg_rank,
+    min(day) as first_seen_day,
+    max(day) as last_seen_day
+  from base
+  group by product_id
+)
+select *
+from summary
+where days_on_board = 1
+order by first_seen_day desc, best_rank asc;
 
 
 
