@@ -234,7 +234,7 @@ def last_updated():
         else:
             approx_days = 0
             
-        if approx_days < 100:
+        if approx_days < 7:
             return f"Recently updated, and {check_methods()}"
         elif approx_days > 180:
             return "API has not been updated in over 6 months; it may have been abandoned"
