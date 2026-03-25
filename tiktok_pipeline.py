@@ -366,7 +366,14 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
 
         commission_rate = parse_money(product.get("commission"))
 
+        product_id=(
+            product.get("product_id")
+            or product.get("id")
+            or product.get("goods_id")
+        )
+
         new_product = {
+            "product_id": str(product_id) if product_id is not None else None,
             "title": raw_title,
             "category": category,
             "cover": cover,
@@ -609,7 +616,7 @@ def pick_top_products(products, top_n=10, min_sales=0, use_recent=False):
 
         scored.append((sales, revenue, p))
 
-    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    scored.sort(key=lambda x: (has_valid_metrics(x[2]), x[0], x[1]), reverse=True)
 
     top = [p for (_, _, p) in scored[:top_n]]
     print(f"Selected {len(top)} top products (min_sales={min_sales}, top_n={top_n})")
