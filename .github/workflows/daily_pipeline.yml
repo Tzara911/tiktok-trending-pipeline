@@ -33,10 +33,13 @@ jobs:
           set -euo pipefail
           mkdir -p logs
           for i in 1 2 3;do
-          echo "Attempt $i..."
-          python tiktok_pipeline.py | tee "logs/run_$(date -u +%F_%H%M%S)_utc.log"
-          echo "Attempt $i failed, retrying in 30s..."
-          sleep 30
+            echo "Attempt $i..."
+            if python tiktok_pipeline.py | tee "logs/run_$(date -u +%F_%H%M%S)_utc.log"
+              break
+            fi  
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done  
           
       - name: Upload outputs
         if: always()
