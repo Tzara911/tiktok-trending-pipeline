@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p logs
-          python tiktok_pipeline.py | tee "logs/run_$(date -u +%F_%H%M%S)_utc.log"
+          python tiktok_pipeline.py | tee "logs/run_$(date -u +%F_%H%M%S)_utc.log"; then
           exit ${PIPESTATUS[0]}
       - name: Upload outputs
         if: always()
