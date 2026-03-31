@@ -32,8 +32,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p logs
+          for i in 1 2 3;do
+          echo "Attempt $i..."
           python tiktok_pipeline.py | tee "logs/run_$(date -u +%F_%H%M%S)_utc.log"
-          exit ${PIPESTATUS[0]}
+          echo "Attempt $i failed, retrying in 30s..."
+          sleep 30
+          
       - name: Upload outputs
         if: always()
         uses: actions/upload-artifact@v4
