@@ -7,7 +7,7 @@ import uuid
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from datetime import datetime,timezone
+from datetime import datetime, timedelta,timezone
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
@@ -399,10 +399,18 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
 
     print(f"\nUpserting {len(products_to_upsert)} products into '{table_name}'...")
     try:
-        response = supabase.table(table_name).upsert(
-            products_to_upsert,
-            on_conflict="title",  # keep this as-is
-        ).execute()
+        #check if 24 hours have passed since first run of the day
+        first_row = supabase.table(table_name).select("created_at").order("created_at", desc=False).limit(1).execute()
+        should_clear =True
+        if first_row.data:
+            first_time= datetime.fromisoformat(first_row.data[0]["created_at"])
+            if datetime.now(timezone.utc)-first_time < timedelta(hours=24):
+                should_clear=False  
+        if should_clear:
+            supabase.table(table_name).delete().neq("id",0).execute()
+            print("Cleared tiktok_products table (24 hrs since first run).")
+                    
+        response = supabase.table(table_name).insert(products_to_upsert).execute()
         print(f"Supabase upsert complete: {len(response.data)} rows.")
     except Exception as e:
         print(f"Error during Supabase upsert: {e}")
