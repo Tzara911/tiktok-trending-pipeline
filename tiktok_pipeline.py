@@ -399,16 +399,8 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
 
     print(f"\nUpserting {len(products_to_upsert)} products into '{table_name}'...")
     try:
-        #check if 24 hours have passed since first run of the day
-        first_row = supabase.table(table_name).select("created_at").order("created_at", desc=False).limit(1).execute()
-        should_clear =True
-        if first_row.data:
-            first_time= datetime.fromisoformat(first_row.data[0]["created_at"])
-            if datetime.now(timezone.utc)-first_time < timedelta(hours=24):
-                should_clear=False  
-        if should_clear:
-            supabase.table(table_name).delete().neq("id",0).execute()
-            print("Cleared tiktok_products table (24 hrs since first run).")
+        supabase.table(table_name).delete().neq("id", 0).execute()
+        print("Cleared tiktok_products table.")
                     
         response = supabase.table(table_name).insert(products_to_upsert).execute()
         print(f"Supabase upsert complete: {len(response.data)} rows.")
