@@ -4,6 +4,9 @@ import json
 import io
 import requests
 import uuid
+import time
+import re
+import random
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -14,6 +17,12 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 load_dotenv()
 
@@ -682,6 +691,152 @@ def map_product_for_pdf(product: dict) -> dict:
         "price": price,
         "commission_rate": commission_rate,
     }
+
+# Scraper Utilities
+
+def human_sleep(a=1.5, b=4.5):
+    time.sleep(random.uniform(a, b))
+
+def create_driver():
+    options = Options()
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+
+    driver = webdriver.Chrome(options=options)
+    wait = WebDriverWait(driver, random.uniform(5, 10))
+    return driver, wait
+
+def load_shop_page(driver, wait, url):
+    driver.get(url)
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.grid")))
+
+def scroll_page(driver):
+    for _ in range(random.randint(3, 5)):
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        human_sleep(2, 5)
+
+# Scraper Data Extraction
+
+def extract_product_basic(product):
+    try:
+        name = product.find_element(By.CSS_SELECTOR, "h3").text.strip()
+        link = product.find_element(By.CSS_SELECTOR, "a").get_attribute("href")
+
+        match = re.search(r'/(\d+)$', link)
+        product_id = match.group(1) if match else None
+
+        price = extract_price(product)
+        sold = extract_sold(product)
+
+        if sold:
+            return {
+                "product_name": name,
+                "link": link,
+                "product_id": product_id,
+                "price": price,
+                "number_sold": sold
+            }
+    except Exception as e:
+        print("Skipping product:", e)
+
+    return None
+
+def extract_price(product):
+    try:
+        try:
+            raw = product.find_element(By.CSS_SELECTOR, "span.line-through").text
+        except:
+            raw = product.find_element(By.CSS_SELECTOR, "span.SmallText1-Semibold").text
+
+        match = re.search(r"(\d+\.\d+)", raw)
+        return match.group(1) if match else None
+    except:
+        return None
+
+def extract_sold(product):
+    try:
+        return product.find_element(By.XPATH, ".//*[contains(text(),'sold')]").text
+    except:
+        return None
+
+def collect_products(driver):
+    products = driver.find_elements(By.CSS_SELECTOR, "div.grid > div")
+    product_list = []
+
+    for product in products:
+        item = extract_product_basic(product)
+        if item:
+            product_list.append(item)
+
+    return product_list
+
+def visit_product_page(driver, wait, item):
+    try:
+        human_sleep(2, 6)
+        driver.get(item["link"])
+
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        human_sleep(3, 7)
+
+        item["category"] = extract_category(driver)
+        item["shop_name"] = extract_shop_name(driver)
+
+        return item if item["category"] else None
+
+    except Exception as e:
+        print("Error visiting product:", e)
+        return None
+
+def extract_category(driver):
+    try:
+        categories = driver.find_elements(By.CSS_SELECTOR, "li a span")
+        cat_list = [c.text.strip() for c in categories if c.text.strip()]
+
+        if len(cat_list) > 1:
+            return cat_list[1]
+    except:
+        pass
+    return None
+
+def extract_shop_name(driver):
+    try:
+        shop_elem = driver.find_element(By.XPATH, "//a[contains(text(),'Sold by')]")
+        return shop_elem.text.replace("Sold by", "").strip().text.replace(" sold", "").strip()
+    except:
+        return None
+
+def scrape_product_details(driver, wait, product_list):
+    data = []
+
+    for item in product_list:
+        result = visit_product_page(driver, wait, item)
+        if result:
+            data.append(result)
+            print(f"Scraped: {result['product_name']}")
+
+    return data
+
+# Runs Scraper (Still in progress to have fully implemented
+
+def scrape():
+    url = "https://www.tiktok.com/shop"
+
+    driver, wait = create_driver()
+
+    try:
+        load_shop_page(driver, wait, url)
+        scroll_page(driver)
+
+        product_list = collect_products(driver)
+        print(f"Collected {len(product_list)} products")
+
+        data = scrape_product_details(driver, wait, product_list)
+
+        save_to_json(data)
+        print("Saved to products2.json")
+
+    finally:
+        driver.quit()
 
 # Main 
 
