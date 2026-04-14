@@ -730,11 +730,11 @@ def extract_product_basic(product):
 
         if sold:
             return {
-                "product_name": name,
+                "title": name,
                 "link": link,
                 "product_id": product_id,
                 "price": price,
-                "number_sold": sold
+                "sale_amount": parse_money(sold)
             }
     except Exception as e:
         print("Skipping product:", e)
@@ -816,24 +816,23 @@ def scrape_product_details(driver, wait, product_list):
 
     return data
 
-# Runs Scraper (Still in progress to have fully implemented
+# Runs Scraper (Still in progress to have fully implemented)
 
 def scrape():
     url = "https://www.tiktok.com/shop"
-
     driver, wait = create_driver()
 
     try:
         load_shop_page(driver, wait, url)
         scroll_page(driver)
-
-        product_list = collect_products(driver)
+        product_list = []
+        
+        for i in range(5):
+            product_list.extend(collect_products(driver))
         print(f"Collected {len(product_list)} products")
 
         data = scrape_product_details(driver, wait, product_list)
-
-        save_to_json(data)
-        print("Saved to products2.json")
+        return data
 
     finally:
         driver.quit()
@@ -848,6 +847,8 @@ def main():
        
         # 1) Fetch + filter from TikTok
         filtered_products = fetch_and_filter(pages=5, pagesize=50)
+        if not filtered_products:
+            filtered_products = scrape()
         if not filtered_products:
             complete_pipeline_run(run_id, status="completed", note="No products after filtering")    
             print("No products after filtering – exiting.")
