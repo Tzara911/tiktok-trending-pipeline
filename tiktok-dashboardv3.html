@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok Shop Product Analysis — Trend Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surface-0:#0a0c10;
+  --surface-1:#0f1117;
+  --surface-2:#151720;
+  --surface-3:#1a1d28;
+  --surface-4:#21242f;
+  --border-1:rgba(255,255,255,.06);
+  --border-2:rgba(255,255,255,.09);
+  --border-3:rgba(255,255,255,.14);
+  --t1:#f8f8fa;
+  --t2:#d4d6de;
+  --t3:#a0a4b2;
+  --t4:#787d90;
+  --t5:#5a5f72;
+  --accent:#f0654a;
+  --accent-dim:rgba(240,101,74,.12);
+  --accent-glow:rgba(240,101,74,.25);
+  --blue:#4e8df5;
+  --blue-dim:rgba(78,141,245,.12);
+  --teal:#36c5a0;
+  --teal-dim:rgba(54,197,160,.12);
+  --amber:#e8a838;
+  --amber-dim:rgba(232,168,56,.12);
+  --rose:#e8436a;
+  --rose-dim:rgba(232,67,106,.1);
+  --font-display:'Outfit',sans-serif;
+  --font-body:'Source Sans 3',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--surface-0);color:var(--t1);font-family:var(--font-body);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* === TOPBAR === */
+.topbar{position:sticky;top:0;z-index:200;background:rgba(10,12,16,.78);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border-bottom:1px solid var(--border-1)}
+.topbar-w{max-width:1400px;margin:0 auto;padding:0 48px;display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{display:flex;align-items:center;gap:16px}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#f5956b);display:grid;place-items:center;font:700 13px/1 var(--font-display);color:#fff;box-shadow:0 2px 12px rgba(240,101,74,.3)}
+.logo-name{font:600 15px/1 var(--font-display);letter-spacing:-.3px;color:var(--t1)}
+.logo-div{width:1px;height:18px;background:var(--border-2)}
+.logo-ctx{font:400 13px/1 var(--font-body);color:var(--t3)}
+.hdr-r{display:flex;align-items:center;gap:10px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);animation:pls 2.4s ease-in-out infinite}
+.pulse.offline{background:var(--rose);box-shadow:0 0 6px var(--rose);animation:none}
+@keyframes pls{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+.pulse-lbl{font:500 11px/1 var(--font-body);color:var(--t4);text-transform:uppercase;letter-spacing:.8px}
+.hdr-ts{font:400 12px/1 var(--font-mono);color:var(--t4);margin-left:16px;padding-left:16px;border-left:1px solid var(--border-1)}
+
+/* === NAV === */
+.nav-bar{border-bottom:1px solid var(--border-1);background:var(--surface-0)}
+.nav-w{max-width:1400px;margin:0 auto;padding:0 48px;display:flex;align-items:stretch}
+.nav-item{position:relative;padding:16px 0;margin-right:36px;font:500 13.5px/1 var(--font-display);letter-spacing:-.1px;color:var(--t4);background:none;border:none;cursor:pointer;font-family:var(--font-display);transition:color .25s}
+.nav-item:hover{color:var(--t2)}
+.nav-item.on{color:var(--t1)}
+.nav-item.on::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:1px 1px 0 0;animation:tabIn .3s ease-out}
+@keyframes tabIn{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.nav-badge{font:600 10.5px/1 var(--font-mono);background:var(--surface-3);color:var(--t4);padding:2px 7px;border-radius:6px;margin-left:8px;vertical-align:1px}
+.nav-item.on .nav-badge{background:var(--accent-dim);color:var(--accent)}
+
+/* === MAIN === */
+.main{padding:32px 48px 72px;max-width:1400px;margin:0 auto}
+
+/* === OVERVIEW === */
+.overview{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+.ov-card{background:var(--surface-1);border:1px solid var(--border-1);border-radius:14px;padding:24px 28px;transition:border-color .25s,transform .25s;position:relative;overflow:hidden}
+.ov-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)}
+.ov-card:hover{border-color:var(--border-2);transform:translateY(-1px)}
+.ov-label{font:600 10.5px/1 var(--font-display);color:var(--t4);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.ov-val{font:700 32px/1 var(--font-display);color:var(--t1);letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+.ov-foot{font:400 12.5px/1 var(--font-body);color:var(--t4);margin-top:10px}
+
+/* === PRODUCT FILTER === */
+.filter-section{margin-bottom:24px;position:relative;z-index:100}
+.filter-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* Dropdown trigger */
+.dd-trigger{
+  display:flex;align-items:center;gap:8px;
+  font:500 13px/1 var(--font-body);
+  background:var(--surface-1);border:1px solid var(--border-2);
+  color:var(--t2);padding:9px 16px;border-radius:10px;
+  cursor:pointer;transition:all .2s;white-space:nowrap;
+  user-select:none;position:relative;
+}
+.dd-trigger:hover{border-color:var(--border-3);background:var(--surface-2)}
+.dd-trigger.open{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.dd-trigger svg{flex-shrink:0;transition:transform .2s}
+.dd-trigger.open svg{transform:rotate(180deg)}
+.dd-count{font:600 11px/1 var(--font-mono);background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:6px}
+
+/* Dropdown panel */
+.dd-panel{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:150;
+  width:340px;max-height:400px;
+  background:var(--surface-2);border:1px solid var(--border-2);
+  border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03);
+  display:flex;flex-direction:column;
+  opacity:0;transform:translateY(-6px);pointer-events:none;
+  transition:opacity .2s,transform .2s;
+}
+.dd-panel.open{opacity:1;transform:translateY(0);pointer-events:all}
+
+.dd-actions{display:flex;gap:0;border-bottom:1px solid var(--border-1)}
+.dd-act{
+  flex:1;font:500 11.5px/1 var(--font-display);
+  background:none;border:none;color:var(--t3);
+  padding:10px;cursor:pointer;transition:all .15s;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.dd-act:first-child{border-right:1px solid var(--border-1)}
+.dd-act:hover{color:var(--t1);background:rgba(255,255,255,.03)}
+
+.dd-list{overflow-y:auto;flex:1;padding:6px 0}
+.dd-list::-webkit-scrollbar{width:5px}
+.dd-list::-webkit-scrollbar-track{background:transparent}
+.dd-list::-webkit-scrollbar-thumb{background:var(--surface-4);border-radius:10px}
+
+.dd-item{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 16px;cursor:pointer;transition:background .12s;
+  font:400 13.5px/1.3 var(--font-body);color:var(--t2);
+}
+.dd-item:hover{background:rgba(255,255,255,.03)}
+.dd-check{
+  width:18px;height:18px;border-radius:5px;flex-shrink:0;
+  border:1.5px solid var(--t5);display:grid;place-items:center;
+  transition:all .15s;
+}
+.dd-item.on .dd-check{background:var(--accent);border-color:var(--accent)}
+.dd-item.on .dd-check::after{content:'';width:10px;height:6px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.dd-item-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-item-cat{font:400 11px/1 var(--font-body);color:var(--t5);margin-top:2px}
+
+/* Selected tags */
+.sel-tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sel-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  font:500 12.5px/1 var(--font-body);
+  background:var(--surface-2);border:1px solid var(--border-2);
+  color:var(--t2);padding:6px 8px 6px 12px;border-radius:8px;
+  transition:all .15s;animation:tagIn .25s ease-out;
+}
+@keyframes tagIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+.sel-tag-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sel-tag-x{
+  width:20px;height:20px;border-radius:5px;
+  display:grid;place-items:center;cursor:pointer;
+  background:transparent;border:none;color:var(--t4);
+  font:500 14px/1 var(--font-body);transition:all .15s;
+}
+.sel-tag-x:hover{background:rgba(255,255,255,.08);color:var(--t1)}
+
+/* === PANELS === */
+.panel{background:var(--surface-1);border:1px solid var(--border-1);border-radius:14px;padding:32px;margin-bottom:20px;position:relative;overflow:hidden}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent)}
+.panel-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px}
+.panel-t{font:700 18px/1.3 var(--font-display);letter-spacing:-.4px;color:var(--t1)}
+.panel-d{font:400 14px/1.4 var(--font-body);color:var(--t3);margin-top:5px}
+.seg{display:flex;gap:2px;background:var(--surface-0);border:1px solid var(--border-1);border-radius:10px;padding:3px}
+.seg-b{font:500 12px/1 var(--font-display);padding:7px 18px;border-radius:8px;cursor:pointer;background:transparent;border:none;color:var(--t4);transition:all .2s;font-family:var(--font-display)}
+.seg-b:hover{color:var(--t2)}
+.seg-b.on{background:var(--surface-3);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.canvas-box{position:relative;height:460px;width:100%}
+
+/* === TABLE === */
+.tbl-scroll{overflow-x:auto}
+table{width:100%;border-collapse:separate;border-spacing:0}
+thead th{text-align:center;padding:14px 18px;font:600 10.5px/1 var(--font-display);color:var(--t5);text-transform:uppercase;letter-spacing:.7px;cursor:pointer;user-select:none;white-space:nowrap;background:var(--surface-1);border-bottom:1px solid var(--border-2);transition:color .2s;position:sticky;top:0}
+thead th:first-child{text-align:left;padding-left:24px}
+thead th:last-child{padding-right:24px}
+thead th:hover{color:var(--t2)}
+thead th.act{color:var(--accent)}
+tbody td{padding:16px 18px;text-align:center;border-bottom:1px solid var(--border-1);vertical-align:middle}
+tbody td:first-child{text-align:left;padding-left:24px}
+tbody td:last-child{padding-right:24px}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+.row-rank{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font:600 12px/1 var(--font-mono);background:var(--surface-3);color:var(--t3);margin-right:14px;flex-shrink:0}
+.row-title{font:600 14px/1.35 var(--font-display);color:var(--t1);letter-spacing:-.2px}
+.row-cat{font:400 12px/1 var(--font-body);color:var(--t4);margin-top:3px}
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:36px;padding:4px 14px;border-radius:100px;font:600 12.5px/1 var(--font-mono);letter-spacing:-.2px}
+.pill-g{background:var(--teal-dim);color:var(--teal)}
+.pill-a{background:var(--amber-dim);color:var(--amber)}
+.pill-r{background:var(--rose-dim);color:var(--rose)}
+.m{font:500 13px/1 var(--font-mono);letter-spacing:-.3px}
+.m-b{color:var(--blue)}
+.m-m{color:var(--t3)}
+.m-d{color:var(--t4);font-size:12px}
+
+/* === STATES === */
+.hide{display:none!important}
+.ld-wrap{display:flex;align-items:center;justify-content:center;height:calc(100vh - 60px);flex-direction:column;gap:24px}
+.ld-spin{width:40px;height:40px;position:relative}
+.ld-spin::before,.ld-spin::after{content:'';position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:var(--accent)}
+.ld-spin::before{animation:rot .9s linear infinite}
+.ld-spin::after{inset:6px;border-top-color:var(--t5);animation:rot 1.4s linear infinite reverse}
+@keyframes rot{to{transform:rotate(360deg)}}
+.ld-msg{font:500 13px/1 var(--font-display);color:var(--t3)}
+.err-wrap{display:flex;align-items:center;justify-content:center;height:calc(100vh - 60px);flex-direction:column;gap:12px;padding:40px;text-align:center}
+.err-wrap h2{font:700 18px/1 var(--font-display);color:var(--accent)}
+.err-wrap p{font:400 14px/1.5 var(--font-body);color:var(--t3);max-width:400px}
+
+.fade-up{opacity:0;transform:translateY(12px);animation:fadeUp .5s ease-out forwards}
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}.d4{animation-delay:.2s}.d5{animation-delay:.25s}.d6{animation-delay:.3s}
+
+@media(max-width:1024px){.overview{grid-template-columns:repeat(2,1fr)}.topbar-w,.nav-w,.main{padding-left:24px;padding-right:24px}.dd-panel{width:300px}}
+@media(max-width:640px){.overview{grid-template-columns:1fr}.canvas-box{height:300px}.panel{padding:20px}.topbar-w{height:52px}.logo-ctx,.logo-div{display:none}.dd-panel{width:calc(100vw - 48px)}}
+</style>
+</head>
+<body>
+
+<header class="topbar"><div class="topbar-w">
+  <div class="logo">
+    <div class="logo-mark">TS</div>
+    <span class="logo-name">TikTok Shop Product Analysis</span>
+    <div class="logo-div"></div>
+    <span class="logo-ctx">Trend Dashboard</span>
+  </div>
+  <div class="hdr-r">
+    <div class="pulse" id="pulseDot"></div>
+    <span class="pulse-lbl" id="pulseLbl">Live</span>
+    <span class="hdr-ts" id="hts"></span>
+  </div>
+</div></header>
+
+<div id="ld" class="ld-wrap">
+  <div class="ld-spin"></div>
+  <div class="ld-msg">Loading product data…</div>
+</div>
+
+<div id="er" class="err-wrap hide">
+  <h2>Connection failed</h2>
+  <p id="em"></p>
+</div>
+
+<div id="app" class="hide">
+
+<nav class="nav-bar"><div class="nav-w">
+  <button class="nav-item on" data-v="rank">Rank Trend<span class="nav-badge" id="nR"></span></button>
+  <button class="nav-item" data-v="sales">Sales Trend</button>
+  <button class="nav-item" data-v="board">Leaderboard<span class="nav-badge" id="nB"></span></button>
+</div></nav>
+
+<main class="main">
+
+  <section class="overview" id="ov">
+    <div class="ov-card fade-up d1"><div class="ov-label">Products Tracked</div><div class="ov-val" id="o1">—</div><div class="ov-foot">Unique product IDs</div></div>
+    <div class="ov-card fade-up d2"><div class="ov-label">Days Monitored</div><div class="ov-val" id="o2">—</div><div class="ov-foot" id="o2f"></div></div>
+    <div class="ov-card fade-up d3"><div class="ov-label">Data Points</div><div class="ov-val" id="o3">—</div><div class="ov-foot">Total snapshots captured</div></div>
+    <div class="ov-card fade-up d4"><div class="ov-label">Latest Capture</div><div class="ov-val" id="o4">—</div><div class="ov-foot" id="o4f"></div></div>
+  </section>
+
+  <!-- PRODUCT FILTER -->
+  <section id="flt" class="filter-section fade-up d5">
+    <div class="filter-row">
+      <!-- Dropdown -->
+      <div style="position:relative">
+        <button class="dd-trigger" id="ddBtn" onclick="toggleDD()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span id="ddLabel">Select products</span>
+          <span class="dd-count" id="ddCount">0</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dd-panel" id="ddPanel">
+          <div class="dd-actions">
+            <button class="dd-act" onclick="xAll()">Select All</button>
+            <button class="dd-act" onclick="xNone()">Clear All</button>
+          </div>
+          <div class="dd-list" id="ddList"></div>
+        </div>
+      </div>
+
+      <!-- Selected tags -->
+      <div class="sel-tags" id="selTags"></div>
+    </div>
+  </section>
+
+  <!-- RANK -->
+  <section id="vR" class="panel fade-up d6">
+    <div class="panel-top"><div><div class="panel-t">Product Rank Movement</div><div class="panel-d">Tracking rank position per product over time — lower rank indicates stronger performance</div></div></div>
+    <div class="canvas-box"><canvas id="cR"></canvas></div>
+  </section>
+
+  <!-- SALES -->
+  <section id="vS" class="panel hide">
+    <div class="panel-top">
+      <div><div class="panel-t" id="sT">Units Sold Over Time</div><div class="panel-d" id="sD">Tracking recent sold count per product across each snapshot day</div></div>
+      <div class="seg">
+        <button class="seg-b on" onclick="sM('sold')">Units Sold</button>
+        <button class="seg-b" onclick="sM('rev')">Revenue</button>
+      </div>
+    </div>
+    <div class="canvas-box"><canvas id="cS"></canvas></div>
+  </section>
+
+  <!-- BOARD -->
+  <section id="vB" class="panel hide">
+    <div class="panel-top"><div><div class="panel-t">Stability Leaderboard</div><div class="panel-d">Products ranked by consistency on the trending board — click any column header to sort</div></div></div>
+    <div class="tbl-scroll">
+      <table><thead><tr>
+        <th onclick="xSort('title')">Product</th>
+        <th onclick="xSort('price')">Price</th>
+        <th onclick="xSort('dob')">Days on Board</th>
+        <th onclick="xSort('br')">Best Rank</th>
+        <th onclick="xSort('ar')">Avg Rank</th>
+        <th onclick="xSort('fs')">First Seen</th>
+        <th onclick="xSort('ls')">Last Seen</th>
+      </tr></thead><tbody id="tb"></tbody></table>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<script>
+const SB="https://gouykiqexfbqieaahhnl.supabase.co";
+const AK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdXlraXFleGZicWllYWFoaG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk3MTQsImV4cCI6MjA4Mzk4NTcxNH0.vgTi_ckmozOJdnHhw3Rl2KsXjmwQN-rshI5b3tvqZiU";
+
+const C=["#f0654a","#4e8df5","#36c5a0","#e8a838","#a270e3","#3aaccc","#e360a0","#8bc63a","#ed7d3a","#6c70f0","#34b8a6","#d64570","#4aacf0","#d4a030","#8a60d0"];
+
+let D=[],P=[],sel=new Set(),view="rank",sm="sold",
+    srt={c:"dob",d:"desc"},chR=null,chS=null,ddOpen=false;
+
+const $=id=>document.getElementById(id);
+function h(s){if(!s)return"";const e=document.createElement("span");e.textContent=s;return e.innerHTML}
+function fd(d){if(!d)return"—";const[,m,dy]=d.split("-");const mn=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return mn[+m]+" "+parseInt(dy)}
+
+/* ——— FETCH ——— */
+let priceMap={};
+async function load(){
+  let a=[],o=0;
+  while(true){
+    const r=await fetch(`${SB}/rest/v1/tiktok_rank_snapshots?select=day,product_id,title,rank,recent_sold_count,sale_amount,total_sold_count,category,shop_name,price&order=day.asc,rank.asc&limit=1000&offset=${o}`,
+      {headers:{apikey:AK,Authorization:`Bearer ${AK}`}});
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+    const b=await r.json();a=a.concat(b);if(b.length<1000)break;o+=1000;
+  }
+  a.forEach(r=>{if(r.product_id&&r.price!=null) priceMap[String(r.product_id)]=Number(r.price)});
+  return a;
+}
+
+/* ——— BOOT ——— */
+function boot(data){
+  D=data;
+  const days=[...new Set(data.map(r=>r.day))].sort();
+  const pm={};
+  data.forEach(r=>{const k=String(r.product_id);if(!pm[k])pm[k]={id:k,title:r.title||k,cat:r.category,price:priceMap[k]??null}});
+  P=Object.values(pm);
+  sel=new Set(P.slice(0,Math.min(6,P.length)).map(p=>p.id));
+
+  $("o1").textContent=P.length;
+  $("o2").textContent=days.length;
+  $("o3").textContent=data.length.toLocaleString();
+  $("o4").textContent=fd(days.at(-1));
+  $("o4f").textContent=days.at(-1)||"";
+  $("o2f").textContent=days.length>1?fd(days[0])+" – "+fd(days.at(-1)):"";
+  $("hts").textContent=fd(days.at(-1));
+  $("nR").textContent=P.length;
+  $("nB").textContent=P.length;
+
+  buildDD();renderTags();drawR();drawS();drawB();
+  $("ld").classList.add("hide");
+  $("app").classList.remove("hide");
+  document.querySelectorAll(".nav-item").forEach(b=>{b.onclick=()=>go(b.dataset.v)});
+
+  // Close dropdown on outside click
+  document.addEventListener("click",e=>{
+    if(!e.target.closest(".filter-section")&&ddOpen) closeDD();
+  });
+}
+
+/* ——— NAV ——— */
+function go(v){
+  view=v;
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  $("vR").classList.toggle("hide",v!=="rank");
+  $("vS").classList.toggle("hide",v!=="sales");
+  $("vB").classList.toggle("hide",v!=="board");
+  $("flt").classList.toggle("hide",v==="board");
+  if(v==="rank")drawR();if(v==="sales")drawS();if(v==="board")drawB();
+}
+
+/* ——— DROPDOWN ——— */
+function toggleDD(){ddOpen?closeDD():openDD()}
+function openDD(){
+  ddOpen=true;
+  $("ddBtn").classList.add("open");
+  $("ddPanel").classList.add("open");
+}
+function closeDD(){
+  ddOpen=false;
+  $("ddBtn").classList.remove("open");
+  $("ddPanel").classList.remove("open");
+}
+
+function buildDD(){
+  const list=$("ddList");
+  list.innerHTML="";
+  P.forEach((p,i)=>{
+    const el=document.createElement("div");
+    el.className="dd-item"+(sel.has(p.id)?" on":"");
+    el.dataset.id=p.id;
+    el.dataset.search=(p.title||"").toLowerCase()+(p.cat||"").toLowerCase();
+    el.innerHTML=`<div class="dd-check"></div><div><div class="dd-item-txt">${h(p.title?.slice(0,42))}</div>${p.cat?`<div class="dd-item-cat">${h(p.cat)}${p.price!=null?" · $"+Number(p.price).toFixed(2):""}</div>`:(p.price!=null?`<div class="dd-item-cat">$${Number(p.price).toFixed(2)}</div>`:"")}</div>`;
+    el.onclick=()=>{
+      if(sel.has(p.id)) sel.delete(p.id); else sel.add(p.id);
+      el.classList.toggle("on",sel.has(p.id));
+      renderTags();updateDDCount();
+      if(view==="rank")drawR();if(view==="sales")drawS();
+    };
+    list.appendChild(el);
+  });
+  updateDDCount();
+}
+
+function filterDD(){}
+
+function updateDDCount(){
+  const n=sel.size;
+  $("ddCount").textContent=n;
+  $("ddLabel").textContent=n===0?"Select products":n+" selected";
+}
+
+function renderTags(){
+  const box=$("selTags");
+  box.innerHTML="";
+  P.forEach((p,i)=>{
+    if(!sel.has(p.id)) return;
+    const col=C[i%C.length];
+    const tag=document.createElement("div");
+    tag.className="sel-tag";
+    tag.innerHTML=`<span class="sel-tag-dot" style="background:${col}"></span><span>${h(p.title?.slice(0,28))}</span><button class="sel-tag-x" data-id="${p.id}">×</button>`;
+    tag.querySelector(".sel-tag-x").onclick=(e)=>{
+      e.stopPropagation();
+      sel.delete(p.id);
+      const item=document.querySelector(`.dd-item[data-id="${p.id}"]`);
+      if(item) item.classList.remove("on");
+      renderTags();updateDDCount();
+      if(view==="rank")drawR();if(view==="sales")drawS();
+    };
+    box.appendChild(tag);
+  });
+  updateDDCount();
+}
+
+function xAll(){
+  sel=new Set(P.map(p=>p.id));
+  document.querySelectorAll(".dd-item").forEach(el=>el.classList.add("on"));
+  renderTags();updateDDCount();
+  if(view==="rank")drawR();if(view==="sales")drawS();
+}
+function xNone(){
+  sel=new Set();
+  document.querySelectorAll(".dd-item").forEach(el=>el.classList.remove("on"));
+  renderTags();updateDDCount();
+  if(view==="rank")drawR();if(view==="sales")drawS();
+}
+
+/* ——— CHARTS ——— */
+function chartCfg(rev){
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:600,easing:"easeOutQuart"},
+    layout:{padding:{top:4,right:8,bottom:4,left:4}},
+    scales:{
+      y:{reverse:!!rev,
+        ticks:{color:"#787d90",font:{size:11,family:"Source Sans 3",weight:"500"},padding:12,
+          callback:rev?v=>"#"+v:v=>v>=1e6?(v/1e6).toFixed(1)+"M":v>=1e3?(v/1e3).toFixed(0)+"K":v},
+        grid:{color:"rgba(255,255,255,.03)",lineWidth:1},border:{display:false},
+        title:rev?{display:true,text:"RANK POSITION",color:"#5a5f72",font:{size:10,family:"Outfit",weight:"600"},padding:{bottom:12}}:{}
+      },
+      x:{ticks:{color:"#787d90",font:{size:11,family:"Source Sans 3",weight:"500"},maxRotation:0,autoSkip:true,maxTicksLimit:12,padding:8},
+        grid:{display:false},border:{display:false}}
+    },
+    plugins:{
+      legend:{display:true,position:"bottom",
+        labels:{color:"#a0a4b2",font:{size:12,family:"Source Sans 3",weight:"500"},boxWidth:8,boxHeight:8,padding:20,usePointStyle:true,pointStyle:"circle"}},
+      tooltip:{backgroundColor:"rgba(15,17,23,.95)",titleColor:"#a0a4b2",bodyColor:"#f8f8fa",
+        borderColor:"rgba(255,255,255,.1)",borderWidth:1,padding:{x:16,y:12},cornerRadius:12,
+        titleFont:{size:11,family:"Source Sans 3",weight:"500"},bodyFont:{size:13,family:"Outfit",weight:"600"},
+        bodySpacing:6,boxPadding:6,usePointStyle:true,
+        callbacks:rev?{label:c=>"  "+c.dataset.label+":  #"+c.parsed.y}:{label:c=>"  "+c.dataset.label+":  "+c.parsed.y?.toLocaleString()}}
+    },
+    interaction:{mode:"index",intersect:false},hover:{mode:"index",intersect:false}
+  };
+}
+
+function mkLine(p,days,field){
+  const dm={};
+  D.filter(r=>String(r.product_id)===p.id).forEach(r=>{dm[r.day]=field?Number(r[field])||0:r.rank});
+  const col=C[P.indexOf(p)%C.length];
+  return{label:p.title?.slice(0,34)||p.id,data:days.map(d=>dm[d]??null),borderColor:col,backgroundColor:col+"1a",borderWidth:2.5,pointRadius:days.length>18?0:3.5,pointHoverRadius:6,pointBackgroundColor:col,pointBorderColor:col,pointHoverBackgroundColor:"#fff",pointHoverBorderColor:col,pointHoverBorderWidth:2.5,tension:.4,spanGaps:true,fill:false};
+}
+
+function drawR(){
+  const days=[...new Set(D.map(r=>r.day))].sort();
+  const ds=P.filter(p=>sel.has(p.id)).map(p=>mkLine(p,days,null));
+  if(chR)chR.destroy();
+  chR=new Chart($("cR"),{type:"line",data:{labels:days.map(fd),datasets:ds},options:chartCfg(true)});
+}
+function drawS(){
+  const days=[...new Set(D.map(r=>r.day))].sort();
+  const f=sm==="sold"?"recent_sold_count":"sale_amount";
+  const ds=P.filter(p=>sel.has(p.id)).map(p=>mkLine(p,days,f));
+  if(chS)chS.destroy();
+  chS=new Chart($("cS"),{type:"line",data:{labels:days.map(fd),datasets:ds},options:chartCfg(false)});
+}
+function sM(m){
+  sm=m;
+  document.querySelectorAll(".seg-b").forEach((b,i)=>b.classList.toggle("on",["sold","rev"][i]===m));
+  $("sT").textContent=m==="sold"?"Units Sold Over Time":"Revenue Over Time";
+  $("sD").textContent=m==="sold"?"Tracking recent sold count per product across each snapshot day":"Tracking sale amount (revenue) per product across each snapshot day";
+  drawS();
+}
+
+/* ——— BOARD ——— */
+function drawB(){
+  const pm={};
+  D.forEach(r=>{
+    const k=String(r.product_id);
+    if(!pm[k])pm[k]={id:k,title:r.title,category:r.category,days:new Set(),ranks:[],fs:r.day,ls:r.day};
+    const p=pm[k];p.days.add(r.day);p.ranks.push(r.rank);if(r.day<p.fs)p.fs=r.day;if(r.day>p.ls)p.ls=r.day;
+  });
+  let rows=Object.values(pm).map(p=>({...p,dob:p.days.size,br:Math.min(...p.ranks),ar:+(p.ranks.reduce((a,b)=>a+b,0)/p.ranks.length).toFixed(1),price:priceMap[p.id]??null}));
+  rows.sort((a,b)=>{const av=a[srt.c],bv=b[srt.c],m=srt.d==="desc"?-1:1;if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;return typeof av==="string"?m*av.localeCompare(bv):m*(Number(av)-Number(bv))});
+
+  const cols=["title","price","dob","br","ar","fs","ls"];
+  document.querySelectorAll("#vB th").forEach((th,i)=>{
+    th.classList.toggle("act",cols[i]===srt.c);
+    const base=th.textContent.replace(/ [↑↓]$/,"");
+    th.textContent=cols[i]===srt.c?base+(srt.d==="desc"?" ↓":" ↑"):base;
+  });
+
+  $("tb").innerHTML=rows.map((p,idx)=>{
+    const dc=p.dob>=5?"pill-g":p.dob>=3?"pill-a":"pill-r";
+    return`<tr>
+      <td style="max-width:320px"><div style="display:flex;align-items:center">
+        <span class="row-rank">${idx+1}</span>
+        <div><div class="row-title">${h(p.title)}</div>${p.category?`<div class="row-cat">${h(p.category)}</div>`:""}</div>
+      </div></td>
+      <td class="m" style="color:var(--teal);font-weight:600">${p.price!=null?"$"+Number(p.price).toFixed(2):"—"}</td>
+      <td><span class="pill ${dc}">${p.dob}</span></td>
+      <td class="m m-b">#${p.br}</td>
+      <td class="m m-m">${p.ar}</td>
+      <td class="m m-d">${fd(p.fs)}</td>
+      <td class="m m-d">${fd(p.ls)}</td>
+    </tr>`;
+  }).join("");
+}
+function xSort(c){if(srt.c===c)srt.d=srt.d==="desc"?"asc":"desc";else{srt.c=c;srt.d="desc"}drawB()}
+
+/* ——— INIT ——— */
+function setStatus(ok){
+  $("pulseDot").classList.toggle("offline",!ok);
+  $("pulseLbl").textContent=ok?"Live":"Offline";
+}
+
+load().then(d=>{
+  if(!d.length){setStatus(false);$("ld").classList.add("hide");$("er").classList.remove("hide");$("em").textContent="No data returned — verify that a read policy exists on tiktok_rank_snapshots.";return}
+  setStatus(true);boot(d);
+}).catch(e=>{setStatus(false);$("ld").classList.add("hide");$("er").classList.remove("hide");$("em").textContent=e.message});
+</script>
+</body>
+</html>
