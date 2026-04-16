@@ -7,7 +7,7 @@ import uuid
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from datetime import datetime,timezone
+from datetime import datetime, timedelta,timezone
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
@@ -399,10 +399,10 @@ def upsert_products_to_supabase(products, run_id: str, table_name: str = "tiktok
 
     print(f"\nUpserting {len(products_to_upsert)} products into '{table_name}'...")
     try:
-        response = supabase.table(table_name).upsert(
-            products_to_upsert,
-            on_conflict="title",  # keep this as-is
-        ).execute()
+        supabase.table(table_name).delete().neq("id", 0).execute()
+        print("Cleared tiktok_products table.")
+                    
+        response = supabase.table(table_name).insert(products_to_upsert).execute()
         print(f"Supabase upsert complete: {len(response.data)} rows.")
     except Exception as e:
         print(f"Error during Supabase upsert: {e}")

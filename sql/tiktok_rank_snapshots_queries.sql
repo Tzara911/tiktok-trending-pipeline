@@ -272,6 +272,18 @@ from summary
 where days_on_board = 1
 order by first_seen_day desc, best_rank asc;
 
+-- Q9: Category-level daily trend
+SELECT
+  day,
+  category,
+  COUNT(DISTINCT product_id) AS unique_products,
+  SUM(recent_sold_count) AS total_recent_sold,
+  AVG(rank)::numeric(10,2) AS avg_rank,
+  SUM(sale_amount) AS total_revenue
+FROM tiktok_rank_snapshots
+WHERE top_k = 10
+GROUP BY day, category
+ORDER BY day DESC, total_recent_sold DESC;
 
 
 
