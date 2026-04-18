@@ -616,9 +616,9 @@ def pick_top_products(products, top_n=10, min_sales=0, use_recent=False):
         if use_recent:
             sales = parse_int(p.get("total_sale_7d_cnt") or p.get("total_sale_1d_cnt"))
         else:
-            sales = parse_int(p.get("sale_cnt"))
+            sales = parse_int(p.get("sale_cnt")) or parse_int(p.get("sale_amount"))
 
-        revenue = parse_money(p.get("total_sale_gmv_amt"))
+        revenue = parse_money(p.get("total_sale_gmv_amt")) or (parse_int(p.get("sale_amount")) * parse_int(p.get("price")))
 
         if sales < min_sales:
             continue
@@ -703,7 +703,7 @@ def create_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
 
     driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, random.uniform(5, 10))
+    wait = WebDriverWait(driver, random.uniform(2, 6))
     return driver, wait
 
 def load_shop_page(driver, wait, url):
@@ -711,7 +711,7 @@ def load_shop_page(driver, wait, url):
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.grid")))
 
 def scroll_page(driver):
-    for _ in range(random.randint(3, 5)):
+    for _ in range(random.randint(2, 4)):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         human_sleep(2, 5)
 
@@ -734,7 +734,7 @@ def extract_product_basic(product):
                 "link": link,
                 "product_id": product_id,
                 "price": price,
-                "sale_amount": parse_money(sold)
+                "sale_amount": parse_money(sold.replace(" sold", "").strip())
             }
     except Exception as e:
         print("Skipping product:", e)
@@ -801,7 +801,7 @@ def extract_category(driver):
 def extract_shop_name(driver):
     try:
         shop_elem = driver.find_element(By.XPATH, "//a[contains(text(),'Sold by')]")
-        return shop_elem.text.replace("Sold by", "").strip().text.replace(" sold", "").strip()
+        return shop_elem.text.replace("Sold by", "").strip()
     except:
         return None
 
@@ -816,7 +816,7 @@ def scrape_product_details(driver, wait, product_list):
 
     return data
 
-# Runs Scraper (Still in progress to have fully implemented)
+# Runs Scraper
 
 def scrape():
     url = "https://www.tiktok.com/shop"
@@ -826,9 +826,7 @@ def scrape():
         load_shop_page(driver, wait, url)
         scroll_page(driver)
         product_list = []
-        
-        for i in range(5):
-            product_list.extend(collect_products(driver))
+        product_list.extend(collect_products(driver))
         print(f"Collected {len(product_list)} products")
 
         data = scrape_product_details(driver, wait, product_list)
