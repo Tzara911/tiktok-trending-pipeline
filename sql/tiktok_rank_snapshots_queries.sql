@@ -289,6 +289,49 @@ ORDER BY day DESC, total_recent_sold DESC;
 
 
 
+--Q10. Top ranked daily within category
+SELECT
+  day, category, product_id, title,
+  recent_sold_count, sale_amount,
+  ROW_NUMBER() OVER (
+    PARTITION BY day, category
+    ORDER BY recent_sold_count DESC
+  ) AS rank_within_category
+FROM tiktok_rank_snapshots
+WHERE top_k = 10
+ORDER BY day DESC, category, rank_within_category;
+
+--Q11. monthly category product ranking
+
+SELECT
+  DATE_TRUNC('month', day) AS month,
+  category, product_id, MAX(title) AS title,
+  SUM(recent_sold_count) AS total_recent_sold,
+  ROW_NUMBER() OVER (
+    PARTITION BY DATE_TRUNC('month', day), category
+    ORDER BY SUM(recent_sold_count) DESC
+  ) AS rank_within_category
+FROM tiktok_rank_snapshots
+WHERE top_k = 10
+GROUP BY DATE_TRUNC('month', day), category, product_id
+ORDER BY month DESC, category, rank_within_category;
+
+
+--Q12.monthly category performance summary
+SELECT
+  DATE_TRUNC('month', day) AS month,
+  category,
+  COUNT(DISTINCT day) AS active_days,
+  COUNT(DISTINCT product_id) AS unique_products,
+  SUM(recent_sold_count) AS total_recent_sold,
+  SUM(sale_amount) AS total_revenue,
+  MIN(rank) AS best_rank,
+  AVG(rank)::numeric(10,2) AS avg_rank
+FROM tiktok_rank_snapshots
+WHERE top_k = 10
+GROUP BY DATE_TRUNC('month', day), category
+ORDER BY month DESC, avg_rank DESC;
+
 
 
 
