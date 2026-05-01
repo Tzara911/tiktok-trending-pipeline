@@ -9,3 +9,4 @@ realtime>=1.0.0
 storage3>=0.5.0
 pytest>=9.0.2       
 pytest-mock>=3.15.1
+selenium
