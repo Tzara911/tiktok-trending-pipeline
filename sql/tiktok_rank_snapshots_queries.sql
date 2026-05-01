@@ -6,6 +6,7 @@
 --====================================
 
 --Query 1  Daily Top-K leaderboard by day
+CREATE OR REPLACE VIEW v_daily_topk_summary AS
 select
    day,
    count(*) as rows,
@@ -19,6 +20,7 @@ group by day order by day desc;
 
 
 --Query 2. Daily top 10 products
+CREATE OR REPLACE VIEW v_daily_top10_products AS
 select
   day,
   rank,
@@ -36,6 +38,7 @@ order by day desc, rank asc;
 
 
 ---Query 3 Day-over-day rank change(negative = moved down, positive = moved up)
+CREATE OR REPLACE VIEW v_rank_change_daily AS
 with daily as (
     select
         day,
@@ -76,7 +79,7 @@ order by day desc, abs(prev_rank-rank) desc;
 
 
 --Query 4. Days on board + best rank +first/last seen
-
+CREATE OR REPLACE VIEW v_product_board_summary AS
 with daily as (
     select
         day,
@@ -103,7 +106,7 @@ order by days_on_board desc, best_rank asc;
 
 
 ---Query 5. Day- over_day sales and revenue change
-
+CREATE OR REPLACE VIEW v_sales_change_daily AS
 with daily as(
     select
         day,
@@ -144,7 +147,7 @@ where prev_recent_sold is not null
 
 
 ---Query 6.  New entries and drop-offs between days
-
+CREATE OR REPLACE VIEW v_entries_dropoffs_daily AS
 with daily as (
     select distinct
         day,
@@ -210,6 +213,7 @@ order by day desc, sort_key asc, rank asc;
 
 
 -- Q7: Time on board more than 1 day (from first collected day to latest day)
+CREATE OR REPLACE VIEW v_multiday_products AS
 with base as (
   select
     day,
@@ -242,6 +246,7 @@ order by days_on_board desc, best_rank asc, avg_rank asc;
 
 
 --Q8: One-day appearances only
+CREATE OR REPLACE VIEW v_oneday_products AS
 with base as (
   select
     day,
@@ -273,6 +278,7 @@ where days_on_board = 1
 order by first_seen_day desc, best_rank asc;
 
 -- Q9: Category-level daily trend
+CREATE OR REPLACE VIEW v_category_daily_trend AS
 SELECT
   day,
   category,
@@ -290,6 +296,8 @@ ORDER BY day DESC, total_recent_sold DESC;
 
 
 --Q10. Top ranked daily within category
+CREATE OR REPLACE VIEW v_category_daily_top AS
+
 SELECT
   day, category, product_id, title,
   recent_sold_count, sale_amount,
@@ -302,7 +310,7 @@ WHERE top_k = 10
 ORDER BY day DESC, category, rank_within_category;
 
 --Q11. monthly category product ranking
-
+CREATE OR REPLACE VIEW v_category_monthly_product_rank AS
 SELECT
   DATE_TRUNC('month', day) AS month,
   category, product_id, MAX(title) AS title,
@@ -318,6 +326,7 @@ ORDER BY month DESC, category, rank_within_category;
 
 
 --Q12.monthly category performance summary
+CREATE OR REPLACE VIEW v_category_monthly_summary AS
 SELECT
   DATE_TRUNC('month', day) AS month,
   category,
